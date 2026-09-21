@@ -1,10 +1,11 @@
-# 🎙️ Lisa Voice Assistant
+# 🎙️ Lisa Voice Assistant — v3 (React + Redux Showcase)
 
-> **A modern, AI-powered full-stack voice assistant built for 2026.**  
-> Lisa combines real-time speech recognition, intelligent LLM responses, live web search, browser geolocation, cloud memory, and natural neural voice synthesis into a seamless conversational experience.
+> **A modern, AI-powered full-stack voice assistant built for 2026.**
+> Lisa v3 combines real-time speech recognition, intelligent LLM responses, live web search, browser geolocation, cloud memory, and natural neural voice synthesis — with **centralized Redux Toolkit state management** in the frontend.
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61DAFB?style=for-the-badge&logo=react" />
+  <img src="https://img.shields.io/badge/Frontend-React%20%2B%20Redux%20%2B%20Vite-61DAFB?style=for-the-badge&logo=react" />
+  <img src="https://img.shields.io/badge/State-Redux%20Toolkit-764ABC?style=for-the-badge&logo=redux" />
   <img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi" />
   <img src="https://img.shields.io/badge/AI-Groq%20LLMs-orange?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Database-Supabase-3ECF8E?style=for-the-badge&logo=supabase" />
@@ -38,6 +39,39 @@ The project emphasizes:
 - ☁️ Persistent cloud memory
 - 📍 Hyper-local context awareness
 - 🔐 Secure authentication
+- 🗂️ Predictable Redux-managed UI state (showcase)
+
+---
+
+# 🗂️ Redux State Management (v3 Highlight)
+
+Lisa v3 migrates core UI state from scattered `useState`/prop-drilling to **Redux Toolkit**, while keeping side-effects (Supabase, FastAPI fetches, audio refs) outside the store.
+
+```text
+frontend/src/store/
+├── store.js              # configureStore: chat + theme + audio
+└── slices/
+    ├── chatSlice.js      # messages, setMessages, addMessage, clearChat
+    ├── themeSlice.js     # theme value, toggleTheme, setTheme
+    └── audioSlice.js     # isRecording, isProcessing
+```
+
+- `Provider` wiring in `src/main.jsx`
+- Components read state via `useSelector` (`ChatWindow`, `Header`, `MicrophoneControls`)
+- Updates via `useDispatch` (`addMessage`, `toggleTheme`, `setRecording`, `setProcessing`, `clearChat`)
+- Async work (transcribe → chat → speak, Supabase sync) stays in `useAudioRecorder` / `useAuth` / `chatService.js` and dispatches results into the store
+- Non-serializable values (`MediaRecorder`, `Audio` refs) intentionally stay out of Redux
+- Debug with **Redux DevTools**: time-travel `chat/addMessage`, `theme/toggleTheme`, `audio/setProcessing`
+
+### 🔍 Verify with Redux DevTools (2 min)
+
+1. Install the "Redux DevTools" browser extension (Chrome/Edge/Firefox).
+2. Run the app (`backend :8000` + `frontend npm run dev` → http://127.0.0.1:5173/).
+3. Open browser DevTools (F12) → Redux tab → confirm state tree: `chat`, `theme`, `audio`.
+4. Try: tap mic → `audio/setRecording` + `chat/addMessage`; Sun/Moon → `theme/toggleTheme`; Trash → `chat/clearChat`.
+5. Use Diff / time-travel slider to step through actions.
+
+> Note: DevTools shows state only on lisa-v3 (lisa-v2 has no store).
 
 ---
 
@@ -86,10 +120,11 @@ Once users authenticate via Supabase:
 # 🏗️ System Architecture
 
 ```text
-                  React + Vite Frontend
-                           │
+                  React + Redux Toolkit + Vite Frontend
+                   (Provider + chat/theme/audio slices)
+                            │
       Audio Blob + Geolocation + User Input
-                           │
+                            │
                            ▼
                 FastAPI Backend (Python)
                            │
@@ -114,6 +149,7 @@ Once users authenticate via Supabase:
 ## Frontend
 
 - React
+- Redux Toolkit + React-Redux (`Provider`, `useSelector`, `useDispatch`, `createSlice`)
 - Vite
 - Tailwind CSS
 - Lucide Icons
@@ -152,7 +188,7 @@ Once users authenticate via Supabase:
 # 📂 Project Structure
 
 ```text
-lisa-v2/
+lisa-v3/
 │
 ├── backend/
 │   ├── routers/
@@ -179,11 +215,18 @@ lisa-v2/
     │   │   └── MicrophoneControls.jsx
     │   │
     │   ├── hooks/
-    │   │   ├── useAudioRecorder.js
-    │   │   ├── useAuth.js
+    │   │   ├── useAudioRecorder.js   # Redux-backed (dispatches addMessage, setRecording/Processing)
+    │   │   ├── useAuth.js            # dispatches setMessages on Supabase sync
     │   │   └── useGeolocation.js
     │   │
-    │   ├── App.jsx
+    │   ├── store/                  # 🗂️ REDUX (v3)
+    │   │   ├── store.js
+    │   │   └── slices/
+    │   │       ├── chatSlice.js
+    │   │       ├── themeSlice.js
+    │   │       └── audioSlice.js
+    │   │
+    │   ├── App.jsx                 # selectors + Provider consumers, no prop-drilling
     │   ├── chatService.js
     │   ├── supabaseClient.js
     │   └── index.css
@@ -280,7 +323,7 @@ Open another terminal.
 cd frontend
 ```
 
-Install packages.
+Install packages (includes `@reduxjs/toolkit` + `react-redux`).
 
 ```bash
 npm install
@@ -356,13 +399,13 @@ dist
 User speaks
       │
       ▼
-Browser records audio
+Browser records audio (audioSlice: setRecording/setProcessing)
       │
       ▼
 FastAPI receives audio
       │
       ▼
-Whisper converts Speech → Text
+Whisper converts Speech → Text (dispatch chat/addMessage[user])
       │
       ▼
 Groq LLM processes prompt
@@ -370,13 +413,13 @@ Groq LLM processes prompt
       ├────────► DuckDuckGo Search (if required)
       │
       ▼
-LLM generates response
+LLM generates response (dispatch chat/addMessage[assistant])
       │
       ▼
 Edge-TTS converts Text → Speech
       │
       ▼
-Frontend plays audio
+Frontend plays audio (selectors re-render ChatWindow/Mic controls)
 ```
 
 ---
@@ -385,6 +428,7 @@ Frontend plays audio
 
 - Modern 2026 architecture
 - Fully decoupled frontend & backend
+- Centralized, debuggable Redux Toolkit state (v3 showcase)
 - Real-time web retrieval
 - Voice-first interaction
 - Secure cloud memory
@@ -456,5 +500,5 @@ Full Stack Developer | AI Enthusiast | Flutter Developer
 ---
 
 <p align="center">
-Built with ❤️ using React, FastAPI, Groq, Supabase & Edge-TTS
+Built with ❤️ using React, Redux Toolkit, FastAPI, Groq, Supabase & Edge-TTS
 </p>
